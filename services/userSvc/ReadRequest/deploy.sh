@@ -26,12 +26,12 @@ svc_name='user'
 svc_name_upper=$(tr [a-z] [A-Z] <<< "$svc_name")
 func_name='ReadSvc'  
 lambda_name="${svc_name_upper}-${func_name}"
-role_name="arn:aws:iam::175343220571:role/${lambda_name}"
+role_name="arn:aws:iam::175343220571:role/lambda_exec"
 
 LAMBDA_ENV=$(cat <<EOF
 {"Variables":{\
 "Test":"$Test", \
-"Name":"$Name", \
+"Name":"$Name" \
 }}
 EOF
 )
