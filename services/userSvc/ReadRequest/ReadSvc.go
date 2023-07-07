@@ -6,10 +6,22 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-xray-sdk-go/xray"
+	"golang_project/libs/domain"
+	"golang_project/libs/infra/ddb"
 	"log"
 	"net/http"
 )
 
+// Application
+var (
+	Revision    string
+	Version     string
+	BuildTime   string
+	application domain.Application
+)
+var entityRepo *ddb.EntityRepository
+
+// init : Lambda 초기화시 실행
 func init() {
 	log.SetFlags(0)
 	// 람다 핸들러에서는 자동으로 세그먼트가 만들어져 컨텍스트로 전달되지만
@@ -18,8 +30,25 @@ func init() {
 	_ = ctx
 	defer seg.Close(nil)
 
+	var err error
+	application, err = domain.NewApplication(Revision, Version, BuildTime)
+	if nil != err {
+		panic(err)
+	}
+	application.Print()
+
 	awsSession := session.Must(session.NewSession())
 	awsSession = xray.AWSSession(awsSession)
+	dbCfg := ddb.LoadDBConfig()
+	db := ddb.NewDDBConnection(awsSession)
+
+	entityRepo, err = ddb.NewEntityRepository(
+		db,
+		dbCfg.TableName,
+		dbCfg.GSIIndexName,
+		dbCfg.LSIIndexName,
+		dbCfg.RecordTTLDays,
+	)
 
 }
 
@@ -34,6 +63,7 @@ func lambdaHandler(ctx context.Context, ev *events.APIGatewayProxyRequest) (Resp
 	if "" == ev.Path {
 		return Response{}, nil
 	}
+	// Debug purpose
 	log.Printf(">> Path:\n %s\n", ev.Path) // {+proxy}부분에 들어오는 문자열 출력, ex) /read/GetCatalogListRequest
 	log.Printf(">> Body:\n %s\n", ev.Body) // 본문 JSON 문자열
 	log.Printf(">> event:\n %v\n", *ev)

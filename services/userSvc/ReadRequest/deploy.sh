@@ -11,15 +11,10 @@ if [ "$#" -eq 1 ]; then
 	fi
 fi
 # ENV
-Test='test'
-Name='changi'
-#TableName='pss-repo'
-#GSIIndexName='SK-DATA-index'
-#RecordTTLDays="100"
-#UserPoolID="ap-northeast-2_966VKbg0r"
-#StripeKey="rk_test_51L3bknFu7SsgJESTWjkD4YBWJn8rF19GG4BPDbvMwu1msIRSiFkNAEZ0gE4sHj6nrXpJKT3yz5zy4A1isKPgJdyM00tNTQQRnF"
+TableName='user-repo'
+RecordTTLDays="100"
+GSIIndexName='SK-DATA-index'
 #ApiProductID='default'
-#ToolProductID='prod_M4rQWODLnyhmbI'
 
 # common
 svc_name='user'
@@ -30,8 +25,9 @@ role_name="arn:aws:iam::175343220571:role/lambda_exec"
 
 LAMBDA_ENV=$(cat <<EOF
 {"Variables":{\
-"Test":"$Test", \
-"Name":"$Name" \
+"TableName":"$TableName", \
+"RecordTTLDays":"$RecordTTLDays", \
+"GSIIndexName":"$GSIIndexName" \
 }}
 EOF
 )
