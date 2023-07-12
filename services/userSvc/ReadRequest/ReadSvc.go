@@ -6,7 +6,9 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-xray-sdk-go/xray"
+	"github.com/pkg/errors"
 	"golang_project/libs/domain"
+	"golang_project/libs/domain/requests"
 	"golang_project/libs/infra/ddb"
 	"log"
 	"net/http"
@@ -64,23 +66,23 @@ func lambdaHandler(ctx context.Context, ev *events.APIGatewayProxyRequest) (Resp
 		return Response{}, nil
 	}
 	// Debug purpose
-	log.Printf(">> Path:\n %s\n", ev.Path) // {+proxy}부분에 들어오는 문자열 출력, ex) /read/GetCatalogListRequest
+	log.Printf(">> Path:\n %s\n", ev.Path) // {+proxy}부분에 들어오는 문자열 출력, ex) /read/GetUserList
 	log.Printf(">> Body:\n %s\n", ev.Body) // 본문 JSON 문자열
 	log.Printf(">> event:\n %v\n", *ev)
 
-	//// readRequest 조립터
-	//// Path = "[svc]/[admin/user/sys]/read/XXXXXXRequest"
-	//httpRequestPath, err := httppath.ParseHTTPRequestPath(ev.Path)
-	//if nil != err {
-	//	err = errors.Wrap(err, "요청 경로 파싱에 실패하였습니다")
-	//	return Response{StatusCode: http.StatusBadRequest, Body: err.Error()}, nil
-	//} else if nil == httpRequestPath {
-	//	err = errors.New("요청 경로 파싱 결과 빈 결과를 반환했습니다")
-	//	return Response{StatusCode: http.StatusBadRequest, Body: err.Error()}, nil
-	//} else if requests.RequestMethodRead != httpRequestPath.RequestMethodType {
-	//	err = errors.Errorf("요청 경로 중 요청 타입이 잘못 입력되었습니다 - expected: %s, actual: %s", requests.RequestMethodRead, httpRequestPath.RequestMethodType)
-	//	return Response{StatusCode: http.StatusBadRequest, Body: err.Error()}, nil
-	//}
+	// readRequest 조립터
+	// Path = "[svc]/[admin/user]/read/{requestName}"
+	httpRequestPath, err := domain.ParseHTTPRequestPath(ev.Path)
+	if nil != err {
+		err = errors.Wrap(err, "요청 경로 파싱에 실패하였습니다")
+		return Response{StatusCode: http.StatusBadRequest, Body: err.Error()}, nil
+	} else if nil == httpRequestPath {
+		err = errors.New("요청 경로 파싱 결과 빈 결과를 반환했습니다")
+		return Response{StatusCode: http.StatusBadRequest, Body: err.Error()}, nil
+	} else if requests.RequestMethodRead != httpRequestPath.RequestMethodType {
+		err = errors.Errorf("요청 경로 중 요청 타입이 잘못 입력되었습니다 - expected: %s, actual: %s", requests.RequestMethodRead, httpRequestPath.RequestMethodType)
+		return Response{StatusCode: http.StatusBadRequest, Body: err.Error()}, nil
+	}
 
 	//var readRequest *commonRead.RawRequest = &commonRead.RawRequest{
 	//	Name:  httpRequestPath.RequestName,
@@ -132,7 +134,7 @@ func lambdaHandler(ctx context.Context, ev *events.APIGatewayProxyRequest) (Resp
 	return Response{
 		StatusCode:      http.StatusOK,
 		IsBase64Encoded: false,
-		Body:            "test",
+		Body:            httpRequestPath.RequestName,
 	}, nil
 }
 
