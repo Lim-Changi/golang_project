@@ -52,6 +52,7 @@ type ReadRequest interface {
 	Request
 	// ProcessReadRequest :
 	ProcessReadRequest(ctx context.Context, svcName string) (response interface{}, err error)
+	// TODO. Repo 준비되면 추가해주어야함
 
 	// GetCreateReadResponseInstanceFunc : 빈 응답 객체생성 대리자 반환
 	GetCreateReadResponseInstanceFunc() CreateReadResponseInstanceFunc

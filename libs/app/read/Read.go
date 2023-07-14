@@ -1,4 +1,4 @@
-package readrequest
+package read
 
 import (
 	"context"

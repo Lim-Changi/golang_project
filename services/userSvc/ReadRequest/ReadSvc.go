@@ -2,15 +2,22 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-xray-sdk-go/xray"
 	"github.com/pkg/errors"
+	"golang_project/libs/app/read"
 	"golang_project/libs/domain"
+	"golang_project/libs/domain/auth"
 	"golang_project/libs/domain/path"
 	"golang_project/libs/domain/requests"
 	"golang_project/libs/infra/ddb"
+	"golang_project/libs/infra/util"
+	config "golang_project/services/userSvc/internal"
+	readrequests "golang_project/services/userSvc/pkg/read"
 	"log"
 	"net/http"
 )
@@ -22,6 +29,7 @@ var (
 	BuildTime   string
 	application domain.Application
 )
+var handler read.Service
 var entityRepo *ddb.EntityRepository
 
 // init : Lambda 초기화시 실행
@@ -39,11 +47,13 @@ func init() {
 		panic(err)
 	}
 	application.Print()
-
+	// Registering ReadRequest Service Map
+	readrequests.Init()
 	awsSession := session.Must(session.NewSession())
 	awsSession = xray.AWSSession(awsSession)
 	dbCfg := ddb.LoadDBConfig()
 	db := ddb.NewDDBConnection(awsSession)
+	unmarshaler, err := read.InitRequestUnmarshaler(readrequests.Requests)
 
 	entityRepo, err = ddb.NewEntityRepository(
 		db,
@@ -52,6 +62,9 @@ func init() {
 		dbCfg.LSIIndexName,
 		dbCfg.RecordTTLDays,
 	)
+	handler = read.InitService(
+		config.SVCName,
+		unmarshaler)
 
 }
 
@@ -85,57 +98,51 @@ func lambdaHandler(ctx context.Context, ev *events.APIGatewayProxyRequest) (Resp
 		return Response{StatusCode: http.StatusBadRequest, Body: err.Error()}, nil
 	}
 
-	//var readRequest *commonRead.RawRequest = &commonRead.RawRequest{
-	//	Name:  httpRequestPath.RequestName,
-	//	Param: []byte(ev.Body),
-	//}
-	//
-	//// RequestContext 추출
-	//reqCtx, err := domain.RetrieveAuthorizerRequestContext(ctx, &domain.RetrieveAuthorizerRequestContextInput{
-	//	AuthType:      httpRequestPath.AuthType,
-	//	RequesterType: httpRequestPath.RequesterType,
-	//	//RequesterType: auth.RequesterSystem, // For Debug Purpose
-	//	Event:       ev,
-	//	ServiceName: cfg.SVCName,
-	//	GetAccessibleResourcePRNListFunc: func(ctx context.Context, userID, serviceName string) ([]string, error) {
-	//		return nil, nil
-	//	},
-	//})
-	//if nil != err {
-	//	err = errors.Wrap(err, "ReadSvc: RequestContext를 추출하지 못했습니다")
-	//	return Response{
-	//		StatusCode:      http.StatusInternalServerError,
-	//		IsBase64Encoded: false,
-	//		Body:            err.Error(),
-	//	}, nil
-	//}
-	//
-	//// ?? 컨텍스트에 심을 것인가? 파라미터로 전달할 것인가?
-	//// 하위 루틴에서 로그 등을 남기는 용도로 사용할때 컨텍스트가 좋을 것!!!!
-	//res, err := handler.Process(domain.EmbedRequestContext(ctx, reqCtx), readRequest)
-	//if nil != err {
-	//	log.Printf("%s: error- %s\n", util.GetCurrentFuncName(), err.Error())
-	//	return Response{
-	//		StatusCode:      http.StatusInternalServerError,
-	//		IsBase64Encoded: false,
-	//		Body:            err.Error(),
-	//	}, nil //err
-	//}
-	//resBytes, err := json.Marshal(res)
-	//fmt.Println("Response Body:::" + string(resBytes))
-	//if nil != err {
-	//	log.Printf("%s: error- %s\n", util.GetCurrentFuncName(), err.Error())
-	//	return Response{
-	//		StatusCode:      http.StatusInternalServerError,
-	//		IsBase64Encoded: false,
-	//		Body:            err.Error(),
-	//	}, nil
-	//}
-	// json.HTMLEscape()
+	var readRequest = &read.RawRequest{
+		Name:  httpRequestPath.RequestName,
+		Param: []byte(ev.Body),
+	}
+
+	// RequestContext 추출
+	reqCtx, err := auth.RetrieveAuthorizerRequestContext(ctx, &auth.RetrieveAuthorizerRequestContextInput{
+		AuthType:      httpRequestPath.AuthType,
+		RequesterType: httpRequestPath.RequesterType,
+		Event:         ev,
+		ServiceName:   config.SVCName,
+	})
+	if nil != err {
+		err = errors.Wrap(err, "ReadSvc: RequestContext 를 추출하지 못했습니다")
+		return Response{
+			StatusCode:      http.StatusInternalServerError,
+			IsBase64Encoded: false,
+			Body:            err.Error(),
+		}, nil
+	}
+
+	res, err := handler.Process(auth.EmbedRequestContext(ctx, reqCtx), readRequest)
+	if nil != err {
+		log.Printf("%s: error- %s\n", util.GetCurrentFuncName(), err.Error())
+		return Response{
+			StatusCode:      http.StatusInternalServerError,
+			IsBase64Encoded: false,
+			Body:            err.Error(),
+		}, nil //err
+	}
+	resBytes, err := json.Marshal(res)
+	fmt.Println("Response Body:::" + string(resBytes))
+	if nil != err {
+		log.Printf("%s: error- %s\n", util.GetCurrentFuncName(), err.Error())
+		return Response{
+			StatusCode:      http.StatusInternalServerError,
+			IsBase64Encoded: false,
+			Body:            err.Error(),
+		}, nil
+	}
+
 	return Response{
 		StatusCode:      http.StatusOK,
 		IsBase64Encoded: false,
-		Body:            httpRequestPath.RequestName,
+		Body:            string(resBytes),
 	}, nil
 }
 
