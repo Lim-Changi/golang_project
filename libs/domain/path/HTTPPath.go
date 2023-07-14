@@ -1,4 +1,4 @@
-package domain
+package path
 
 import (
 	"golang_project/libs/domain/auth"

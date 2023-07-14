@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-xray-sdk-go/xray"
 	"github.com/pkg/errors"
 	"golang_project/libs/domain"
+	"golang_project/libs/domain/path"
 	"golang_project/libs/domain/requests"
 	"golang_project/libs/infra/ddb"
 	"log"
@@ -72,7 +73,7 @@ func lambdaHandler(ctx context.Context, ev *events.APIGatewayProxyRequest) (Resp
 
 	// readRequest 조립터
 	// Path = "[svc]/[admin/user]/read/{requestName}"
-	httpRequestPath, err := domain.ParseHTTPRequestPath(ev.Path)
+	httpRequestPath, err := path.ParseHTTPRequestPath(ev.Path)
 	if nil != err {
 		err = errors.Wrap(err, "요청 경로 파싱에 실패하였습니다")
 		return Response{StatusCode: http.StatusBadRequest, Body: err.Error()}, nil
